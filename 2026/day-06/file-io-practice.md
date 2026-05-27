@@ -1,4 +1,4 @@
-Day 06 – File Read/Write Practice
+#Day 06 – File Read/Write Practice
 Commands I Ran
 1. Create the file
 ```bash
