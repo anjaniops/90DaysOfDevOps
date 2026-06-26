@@ -1,94 +1,105 @@
-# Day 36 – Docker Project: Dockerize a Full Application
+# Task Tracker — Dockerized (Flask + Postgres)
 
-## Task
-Today's goal is to **take a real application and Dockerize it end-to-end**.
+A minimal task tracker (add / toggle done / delete) built with **Flask**
+and **PostgreSQL**, fully containerized with a multi-stage Dockerfile and
+orchestrated via **Docker Compose**.
 
-No tutorials. No hand-holding. Pick an app, write the Dockerfile, set up Compose, and ship it. This is what you'll do on the job.
-
----
-
-## Expected Output
-- A markdown file: `day-36-docker-project.md`
-- Complete project with Dockerfile, docker-compose.yml, and app code
-- Image pushed to Docker Hub
+This was built as Day 36 of #90DaysOfDevOps to practice taking a real
+two-tier app from code → Dockerfile → Compose → Docker Hub → fresh pull test.
 
 ---
 
-## Challenge Tasks
+## What it does
 
-### Task 1: Pick Your App
-Choose **one** of these (or use your own project):
-- A **Python Flask/Django** app with a database
-- A **Node.js Express** app with MongoDB
-- A **static website** served by Nginx with a backend API
-- Any app from your GitHub that doesn't have Docker yet
-
-If you don't have an app, clone a simple open-source one and Dockerize it.
+- Add a task
+- Click a task to mark it done/undone
+- Delete a task
+- All data persisted in Postgres (survives container restarts via a named volume)
+- `/health` endpoint checks DB connectivity — used by the container `HEALTHCHECK`
 
 ---
 
-### Task 2: Write the Dockerfile
-1. Create a Dockerfile for your application
-2. Use a **multi-stage build** if applicable
-3. Use a **non-root user**
-4. Keep the image **small** — use alpine or slim base images
-5. Add a `.dockerignore` file
+## Architecture
 
-Build and test it locally.
+```
+┌─────────────┐        ┌──────────────┐
+│   app (Flask │  -->   │  db (Postgres │
+│   + Gunicorn)│        │   16-alpine)  │
+└─────────────┘        └──────────────┘
+      :5000                  :5432
+        \________task-net________/
+```
 
----
-
-### Task 3: Add Docker Compose
-Write a `docker-compose.yml` that includes:
-1. Your **app** service (built from Dockerfile)
-2. A **database** service (Postgres, MySQL, MongoDB — whatever your app needs)
-3. **Volumes** for database persistence
-4. A **custom network**
-5. **Environment variables** for configuration (use `.env` file)
-6. **Healthchecks** on the database
-
-Run `docker compose up` and verify everything works together.
+- `app` only starts after `db` reports **healthy** (`depends_on: condition: service_healthy`)
+- Postgres data lives in the named volume `pgdata`, so `docker compose down` (without `-v`) keeps your data
+- Both services sit on a custom bridge network `task-net`
 
 ---
 
-### Task 4: Ship It
-1. Tag your app image
-2. Push it to Docker Hub
-3. Share the Docker Hub link
-4. Write a `README.md` in your project with:
-   - What the app does
-   - How to run it with Docker Compose
-   - Any environment variables needed
+## Run it with Docker Compose
+
+### Option A — Pull pre-built image from Docker Hub
+
+```bash
+git clone <this-repo>
+cd day-36
+cp .env.example .env          # edit values if you want
+docker compose up -d
+```
+
+The `app` service in `docker-compose.yml` already points at
+`anjaniops/task-tracker:latest` from Docker Hub, so `docker compose up`
+will pull it if it's not built locally.
+
+### Option B — Build from source
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+Then open: **http://localhost:5000**
+
+### Stop everything
+
+```bash
+docker compose down        # keeps the pgdata volume
+docker compose down -v     # also wipes the database volume
+```
 
 ---
 
-### Task 5: Test the Whole Flow
-1. Remove all local images and containers
-2. Pull from Docker Hub and run using only your compose file
-3. Does it work fresh? If not — fix it until it does
+## Environment variables (`.env`)
+
+| Variable            | Purpose                          | Default     |
+|----------------------|-----------------------------------|--------------|
+| `POSTGRES_DB`        | Database name (Postgres container)| `taskdb`     |
+| `POSTGRES_USER`       | DB superuser for Postgres image   | `taskuser`   |
+| `POSTGRES_PASSWORD`   | DB password for Postgres image    | *(set your own)* |
+| `DB_HOST`             | Hostname the app uses to reach DB | `db`         |
+| `DB_NAME`             | Must match `POSTGRES_DB`          | `taskdb`     |
+| `DB_USER`             | Must match `POSTGRES_USER`        | `taskuser`   |
+| `DB_PASSWORD`         | Must match `POSTGRES_PASSWORD`    | *(set your own)* |
+| `DB_PORT`             | Postgres port                     | `5432`       |
+
+Copy `.env.example` to `.env` and set real values before running.
+**`.env` is gitignored** — never commit real secrets.
 
 ---
 
-## Documentation
-Create `day-36-docker-project.md` with:
-- What app you chose and why
-- Your Dockerfile (with comments explaining each line)
-- Challenges you faced and how you solved them
-- Final image size
-- Docker Hub link
+## Docker Hub
+
+Image: **https://hub.docker.com/r/anjaniops/task-tracker**
+
+```bash
+docker pull anjaniops/task-tracker:latest
+```
 
 ---
 
-## Submission
-1. Add all project files and `day-36-docker-project.md` to `2026/day-36/`
-2. Commit and push to your fork
+## Tech stack
 
----
-
-## Learn in Public
-Share your Dockerized project on LinkedIn — include the Docker Hub link so others can pull and run it.
-
-`#90DaysOfDevOps` `#DevOpsKaJosh` `#TrainWithShubham`
-
-Happy Learning!
-**TrainWithShubham**
+- Python 3.12 / Flask / Gunicorn
+- PostgreSQL 16 (alpine)
+- Docker multi-stage build, non-root container user
+- Docker Compose v2 (healthchecks, named volumes, custom bridge network)
